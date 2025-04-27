@@ -51,7 +51,8 @@ fn main() -> anyhow::Result<()> {
             target_os = "ios",
             target_os = "android"
         ))]
-        let webview = builder.build(&window)?;
+        // need to use `build_as_child` to make with_bounds work
+        let webview = builder.build_as_child(&window)?;
 
         #[cfg(not(any(
             target_os = "windows",
