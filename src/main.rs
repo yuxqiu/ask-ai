@@ -5,26 +5,33 @@ use std::{
 
 use anyhow::Context;
 use directories::ProjectDirs;
+use input::Input;
+use layout::{compute_bounds, compute_optimal_window_layout};
+use providers::{ModelProvider, chatgpt::ChatGPT};
 use tao::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
-use wry::{
-    Rect, WebContext, WebViewBuilder,
-    dpi::{LogicalPosition, LogicalSize},
-};
+use wry::dpi::LogicalPosition;
+use wry::{Rect, WebContext, WebViewBuilder, dpi::LogicalSize};
 
+mod input;
 mod layout;
+mod providers;
 
 fn main() -> anyhow::Result<()> {
     let event_loop = EventLoop::new();
-
-    // https://github.com/rust-windowing/winit/issues/862
-    // - set window non-resizable enables floating
     let window = WindowBuilder::new()
         .with_decorations(false)
         .build(&event_loop)?;
+
+    let data_dir = if let Some(proj_dirs) = ProjectDirs::from("", "yuxqiu", "ai") {
+        proj_dirs.config_dir().to_owned()
+    } else {
+        Path::new("./data").to_path_buf()
+    };
+    let mut context = WebContext::new(Some(data_dir));
 
     #[cfg(not(any(
         target_os = "windows",
@@ -68,118 +75,102 @@ fn main() -> anyhow::Result<()> {
         Ok(webview)
     };
 
-    let size = window.inner_size().to_logical::<u32>(window.scale_factor());
-    let input_height = 1;
+    let input_height = 100;
+    let mut size = window.inner_size().to_logical::<u32>(window.scale_factor());
+    println!("{:?}", size);
+    size.height -= input_height;
 
-    let data_dir = if let Some(proj_dirs) = ProjectDirs::from("", "yuxqiu", "ai") {
-        proj_dirs.config_dir().to_owned()
-    } else {
-        Path::new("./data").to_path_buf()
-    };
-    let mut context = WebContext::new(Some(data_dir));
+    // specify any newly added providers here
+    const N: usize = 1;
+    let providers: [&dyn ModelProvider; N] = [&ChatGPT];
 
-    let builder = WebViewBuilder::with_web_context(&mut context)
-        .with_bounds(Rect {
-            position: LogicalPosition::new(0, 0).into(),
-            size: LogicalSize::new(size.width / 2, size.height - input_height).into(),
-        })
-        .with_url("https://chatgpt.com");
-    let webview = build_webview(builder)?;
-    let webview = Arc::new(Mutex::new(webview));
+    let layout = compute_optimal_window_layout(size, providers.len());
+    let bounds = compute_bounds::<N>(size, layout);
 
-    let builder2 = WebViewBuilder::with_web_context(&mut context)
-        .with_bounds(Rect {
-            position: LogicalPosition::new(size.width / 2, 0).into(),
-            size: LogicalSize::new(size.width / 2, size.height - input_height).into(),
-        })
-        .with_url("https://grok.com");
-    let webview2 = build_webview(builder2)?;
-    let webview2 = Arc::new(Mutex::new(webview2));
+    let webviews = array_util::try_from_fn::<_, N, _>(|i| {
+        let wb = providers[i].setup(WebViewBuilder::with_web_context(&mut context));
+        build_webview(wb.with_bounds(bounds[i]))
+    })?
+    .map(Mutex::new)
+    .map(Arc::new);
 
     // Bottom input area (as a WebView)
-    let webview_for_input = webview.clone();
-    let webview2_for_input = webview2.clone();
-    let input_height = 50;
-    let input_webview_builder = WebViewBuilder::new()
-        .with_bounds(Rect {
-            position: LogicalPosition::new(0, size.height - input_height).into(),
-            size: LogicalSize::new(size.width, input_height).into(),
-        })
-        .with_html(r#"
-<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#222;">
-  <textarea id="userInput"
-    style="width:100%;height:100%;font-size:20px;background:#333;color:white;border:none;outline:none;padding:10px;resize:none;overflow:hidden;word-wrap:break-word;white-space:pre-wrap;box-sizing:border-box;"
-    placeholder="Type here and press Enter..."
-    autofocus
-    onkeydown="if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        window.ipc.postMessage(document.getElementById('userInput').value);
-        document.getElementById('userInput').value = '';
-    }"
-  ></textarea>
-</body>
-</html>
-"#)
-        .with_ipc_handler(move |message| {
-            println!("User entered: {}", message.body());
-            let js_code = format!(
-                "document.body.innerHTML += '<p>{}</p>';",
-                message.body()
-            );
-            {
-                webview_for_input.lock().unwrap().evaluate_script(&js_code).unwrap();
-            }
-            {
-                webview2_for_input.lock().unwrap().evaluate_script(&js_code).unwrap();
-            }
-        });
-    let input_webview = build_webview(input_webview_builder)?;
-    let input_webview = Arc::new(Mutex::new(input_webview));
+    let webviews_for_input = webviews.clone();
+    let input = Input::setup(WebViewBuilder::new(), move |message| {
+        for (i, provider) in providers.iter().enumerate() {
+            provider
+                .call(
+                    &webviews_for_input[i]
+                        .lock()
+                        .expect("failed to acquire the lock"),
+                    message.body(),
+                )
+                .with_context(|| format!("failed to call provider {i}"))
+                .unwrap()
+        }
+    })
+    .with_bounds(Rect {
+        position: LogicalPosition::new(0, size.height - input_height).into(),
+        size: LogicalSize::new(size.width, input_height).into(),
+    });
+    let input = Input::new(build_webview(input)?);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
+            // For some strange reason, the first screen is not drawn correctly,
+            // but immediately after the window loses and regains focus, it draws the window correctly.
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                let size = size.to_logical::<u32>(window.scale_factor());
-                {
+                let mut size = size.to_logical::<u32>(window.scale_factor());
+                size.height -= input_height;
+                let bounds = compute_bounds::<N>(size, layout);
+
+                for (webview, bound) in webviews.iter().zip(bounds) {
                     webview
                         .lock()
-                        .unwrap()
-                        .set_bounds(Rect {
-                            position: LogicalPosition::new(0, 0).into(),
-                            size: LogicalSize::new(size.width / 2, size.height - input_height)
-                                .into(),
-                        })
-                        .unwrap();
+                        .expect("failed to acquire the lock")
+                        .set_bounds(bound)
+                        .expect("resize failed: `set_bounds` failed");
                 }
+
                 {
-                    webview2
-                        .lock()
-                        .unwrap()
+                    input
                         .set_bounds(Rect {
-                            position: LogicalPosition::new(size.width / 2, 0).into(),
-                            size: LogicalSize::new(size.width / 2, size.height - input_height)
-                                .into(),
-                        })
-                        .unwrap();
-                }
-                {
-                    input_webview
-                        .lock()
-                        .unwrap()
-                        .set_bounds(Rect {
-                            position: LogicalPosition::new(0, size.height - input_height).into(),
+                            position: LogicalPosition::new(0, size.height).into(),
                             size: LogicalSize::new(size.width, input_height).into(),
                         })
                         .unwrap();
                 }
             }
+            // This helps a bit, but the first screen is still not correct (until the mouse hovers through the window)
+            //
+            // Event::RedrawRequested(_) => {
+            //     // Ensure WebView is resized during redraw
+            //     let mut size = window.inner_size().to_logical::<u32>(window.scale_factor());
+            //     size.height -= input_height;
+            //     let bounds = compute_bounds::<N>(size, layout);
+
+            //     for (webview, bound) in webviews.iter().zip(bounds) {
+            //         webview
+            //             .lock()
+            //             .expect("failed to acquire the lock")
+            //             .set_bounds(bound)
+            //             .expect("resize failed: `set_bounds` failed");
+            //     }
+
+            //     {
+            //         input
+            //             .set_bounds(Rect {
+            //                 position: LogicalPosition::new(0, size.height).into(),
+            //                 size: LogicalSize::new(size.width, input_height).into(),
+            //             })
+            //             .unwrap();
+            //     }
+            // }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
