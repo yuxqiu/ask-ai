@@ -34,6 +34,8 @@ Run the app:
 
 - ✅ **Current**: Basic multi-LLM chat functionality with ChatGPT and Grok
 - 🔜 Support for more LLMs, including local models via [Ollama](https://ollama.com/)
+- 🔘 Support for file uploads, search, reasoning, and other user interaction buttons
+- 🌍 Improve IME support for non-Latin scripts
 - 🎨 UI redesign to better manage multiple conversations (browser-like tabbed interface)
 - 🧪 Cross-platform testing (Windows, macOS, Linux) and prebuilt release artifacts
 
