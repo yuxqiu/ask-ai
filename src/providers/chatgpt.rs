@@ -7,7 +7,9 @@ pub struct ChatGPT;
 impl ModelProvider for ChatGPT {
     fn call(&self, webview: &WebView, input: &str) -> anyhow::Result<()> {
         let script = format!(
-            // Derived from: https://github.com/bsorrentino/AI-MultiPrompt-Extension/tree/main/Chrome
+            // Adapted from: https://github.com/bsorrentino/AI-MultiPrompt-Extension/tree/main/Chrome
+            // - Enter event is replaced by clicking the button because Enter corresponds to a newline
+            //   on small-screen devices.
             r#"
 (function() {{
     const promptElem = document.querySelector("form #prompt-textarea");
@@ -35,21 +37,6 @@ impl ModelProvider for ChatGPT {
             }})
         }}
 
-        const pressEnter = (onElem) => {{
-            // Create a new KeyboardEvent
-            const enterEvent = new KeyboardEvent('keydown', {{
-                bubbles: true, // Make sure the event bubbles up through the DOM
-                cancelable: true, // Allow it to be canceled
-                key: 'Enter', // Specify the key to be 'Enter'
-                code: 'Enter', // Specify the code to be 'Enter' for newer browsers
-                which: 13 // The keyCode for Enter key (legacy property)
-            }});
-
-            // Dispatch the event on the textarea element
-            onElem.dispatchEvent(enterEvent);
-
-        }}
-
         const retrySetFocusUntilSuccess = (onElem, retry) => {{
             console.debug('focus attempt remaining ', retry);
             if (retry === 0) {{
@@ -62,7 +49,16 @@ impl ModelProvider for ChatGPT {
         }}
 
         retrySetFocusUntilSuccess(promptElem, 3)
-            .then(() => pressEnter(promptElem))
+            .then(() => {{
+                // Find the submit button by ID and trigger a click event
+                const submitButton = document.getElementById("composer-submit-button");
+                if (submitButton) {{
+                    submitButton.click();
+                    console.log("Form submission triggered by clicking the submit button.");
+                }} else {{
+                    console.warn("Submit button not found!");
+                }}
+            }})
             .catch((e) => console.warn(e.message));
     }}
 }})();
