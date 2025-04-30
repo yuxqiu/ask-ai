@@ -1,25 +1,25 @@
-## Why no Tauri
+## Why No Tauri
 
-1. Multiwebview layout is incorrect on Linux: https://github.com/tauri-apps/tauri/issues/13071
+1. The multi-webview layout is broken on Linux: [GitHub Issue #13071](https://github.com/tauri-apps/tauri/issues/13071).
 
-## Why tao + wry
+## Why Tao + Wry
 
-So, I have to use tao + wry to build a multiwebview window from scratch.
-- Supporting it on Linux is a bit tricky: https://github.com/tauri-apps/wry/issues/1314
+To build a multi-webview window from scratch, I have to use Tao and Wry.
+- Supporting it on Linux is a bit tricky: [GitHub Issue #1314](https://github.com/tauri-apps/wry/issues/1314).
 
-Supporting cookie is a bit tricky:
-- Initially, I tried to find APIs to get cookies and set cookies. However, found: https://github.com/tauri-apps/wry/issues/1511#issue-2892146782, which is a bit disappointing.
-- At the end, this problem was fixed by using `WebContext`, which allows us to instantiate webview with `data_directory` (though not supported on MacOS: https://github.com/tauri-apps/wry/issues/1321).
+Handling cookies is also challenging:
+- Initially, I tried to find APIs for getting and setting cookies. However, I encountered [this issue](https://github.com/tauri-apps/wry/issues/1511#issue-2892146782), which was disappointing.
+- Ultimately, I solved the problem using `WebContext`, which allows us to instantiate a webview with a `data_directory` (though this is not supported on macOS: [GitHub Issue #1321](https://github.com/tauri-apps/wry/issues/1321)).
 
-## Why no tray icon
+## Why No Tray Icon
 
-Simply said, it's not that useful. I could bind a keyboard shortcut to start it (see below).
+Simply put, it’s not very useful. I could bind a keyboard shortcut to start the app (as described below).
 
-## Why no floating window
+## Why No Floating Window
 
-Although floating window can be made possible by setting windows to non-resizable, on wayland + sway, it's hard to precisely control where the floating window shows up. So, eventually, I decided to simply build a standalone app.
-- Float via non-resizable: https://github.com/rust-windowing/winit/issues/862
+Although it is possible to create a floating window by setting windows to non-resizable, on Wayland + Sway, it’s difficult to control where the floating window appears. Therefore, I decided to build a standalone app instead.
+- Floating via non-resizable: [GitHub Issue #862](https://github.com/rust-windowing/winit/issues/862).
 
-## Why no keyboard binding
+## Why No Keyboard Binding
 
-Simply, it's not easy (at least I have no idea). At the end, on wayland, this needs to be configured within the compositor. Given that it's hard to do floating window, I decided to not proceed this further as well (since I could easily bind a shortcut to start the app on my compositor).
+Simply put, it’s not easy (at least, I don’t know how to do it). On Wayland, this requires configuration within the compositor. Since controlling a floating window is already challenging, I chose not to pursue this further, especially since I can easily bind a shortcut to start the app directly from my compositor.
