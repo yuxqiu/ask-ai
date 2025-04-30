@@ -7,7 +7,7 @@ use anyhow::Context;
 use directories::ProjectDirs;
 use input::Input;
 use layout::{compute_bounds, compute_optimal_window_layout};
-use providers::{ModelProvider, chatgpt::ChatGPT};
+use providers::{ModelProvider, chatgpt::ChatGPT, grok::Grok};
 use tao::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -77,12 +77,11 @@ fn main() -> anyhow::Result<()> {
 
     let input_height = 100;
     let mut size = window.inner_size().to_logical::<u32>(window.scale_factor());
-    println!("{:?}", size);
     size.height -= input_height;
 
     // specify any newly added providers here
-    const N: usize = 1;
-    let providers: [&dyn ModelProvider; N] = [&ChatGPT];
+    const N: usize = 2;
+    let providers: [&dyn ModelProvider; N] = [&ChatGPT, &Grok];
 
     let layout = compute_optimal_window_layout(size, providers.len());
     let bounds = compute_bounds::<N>(size, layout);
@@ -110,7 +109,7 @@ fn main() -> anyhow::Result<()> {
         }
     })
     .with_bounds(Rect {
-        position: LogicalPosition::new(0, size.height - input_height).into(),
+        position: LogicalPosition::new(0, size.height).into(),
         size: LogicalSize::new(size.width, input_height).into(),
     });
     let input = Input::new(build_webview(input)?);
