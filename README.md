@@ -16,7 +16,9 @@
 
 ## 🚀 Getting Started
 
-Clone the repository and build the app:
+If you're using Linux, begin by installing the required dependencies as described in both the [Tao Linux setup guide](https://github.com/tauri-apps/tao#linux) and [Wry Linux setup guide](https://github.com/tauri-apps/wry#linux-dependencies).
+
+Next, clone the repository and build the application:
 
 ```sh
 git clone https://github.com/yuxqiu/ask-ai
