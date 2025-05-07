@@ -60,9 +60,13 @@ jobs:
         name: ai-${{ matrix.target }}
         path: target/${{ matrix.target }}/release/ai${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
 
+    - name: Rename files for release
+      if: github.event_name == 'release'
+      run: |
+        mv target/${{ matrix.target }}/release/ai${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }} ai-${{ matrix.target }}${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
+
     - name: Attach to GitHub Release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
-        files: target/${{ matrix.target }}/release/ai${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
-        name: ai-${{ matrix.target }}${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
+        files: ai-${{ matrix.target }}${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
