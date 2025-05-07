@@ -6,7 +6,9 @@ edition = "2024"
 [dependencies]
 wry = "0.51.2"
 anyhow = "1.0.98"
-gtk = "0.18.2"
 tao = "0.33.0"
 directories = "6.0.0"
 array-util = "1.0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18.2"
