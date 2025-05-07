@@ -16,7 +16,7 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             rustup_target: x86_64-unknown-linux-gnu
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             rustup_target: aarch64-unknown-linux-gnu
           - os: windows-latest
@@ -43,7 +43,7 @@ jobs:
         targets: ${{ matrix.rustup_target }}
 
     - name: Install Linux dependencies for Tao and Wry
-      if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm64'
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
       run: |
         sudo apt-get update
         sudo apt-get install -y \
