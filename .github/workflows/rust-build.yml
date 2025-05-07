@@ -58,11 +58,11 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ai-${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/ai
+        path: target/${{ matrix.target }}/release/ai${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
 
     - name: Attach to GitHub Release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
-        files: target/${{ matrix.target }}/release/ai
-        name: ai-${{ matrix.target }}${{ matrix.target == 'x86_64-pc-windows-msvc' || matrix.target == 'aarch64-pc-windows-msvc' && '.exe' || '' }}
+        files: target/${{ matrix.target }}/release/ai${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
+        name: ai-${{ matrix.target }}${{ endsWith(matrix.target, '-pc-windows-msvc') && '.exe' || '' }}
